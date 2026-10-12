@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>日期天数计算器</title>
+<!--
+  插件式工具：日期天数计算
+  1) 两个日期相差多少天；2) 今天距离目标日期还有多少天；3) 某日期加上 N 天是哪天。
+  纯前端实现，适合社团活动倒计时、纪念日计算等场景。
+-->
+<style>
+  body { font-family: "Microsoft YaHei", Arial, sans-serif; max-width: 560px; margin: 20px auto; padding: 0 16px; color: #333; }
+  h1 { font-size: 18px; border-bottom: 2px solid #1e6bb8; padding-bottom: 8px; }
+  .card { border: 1px solid #e3e8ee; border-radius: 8px; padding: 14px 16px; margin: 14px 0; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; color: #1e6bb8; }
+  .card label { font-size: 13px; color: #666; margin-right: 4px; }
+  .card input { padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+  .card input[type="date"] { margin-right: 10px; }
+  .card input[type="number"] { width: 80px; }
+  button { padding: 8px 20px; border: none; border-radius: 6px; background: #1e6bb8; color: #fff; font-size: 14px; cursor: pointer; margin-top: 8px; }
+  button:hover { opacity: .85; }
+  .out { margin-top: 10px; font-size: 16px; font-weight: 700; color: #d9534f; min-height: 24px; }
+  .out small { font-weight: 400; color: #888; }
+  .hint { color: #888; font-size: 12px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<h1>日期天数计算器</h1>
+
+<div class="card">
+  <h2>① 两日期相差天数</h2>
+  <label>开始日期：</label><input type="date" id="d1">
+  <label>结束日期：</label><input type="date" id="d2">
+  <button onclick="calcDiff()">计算</button>
+  <div class="out" id="outDiff"></div>
+</div>
+
+<div class="card">
+  <h2>② 距目标日还有几天</h2>
+  <label>目标日期：</label><input type="date" id="target">
+  <button onclick="calcTarget()">计算</button>
+  <div class="out" id="outTarget"></div>
+</div>
+
+<div class="card">
+  <h2>③ 日期加 N 天</h2>
+  <label>起始日期：</label><input type="date" id="base">
+  <label>加（天）：</label><input type="number" id="days" min="-3650" max="3650" value="7">
+  <button onclick="calcAdd()">计算</button>
+  <div class="out" id="outAdd"></div>
+</div>
+
+<p class="hint">说明：结果均为自然日差（含起止当天按 0 点起算）。本工具仅在浏览器本地运行。</p>
+
+<script>
+function parseDate(id) {
+  var v = document.getElementById(id).value;
+  if (!v) return null;
+  return new Date(v + 'T00:00:00');
+}
+
+function dayDiff(a, b) {
+  return Math.round((b - a) / 86400000);
+}
+
+function fmtDate(d) {
+  return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
+}
+
+function calcDiff() {
+  var a = parseDate('d1');
+  var b = parseDate('d2');
+  var el = document.getElementById('outDiff');
+  if (!a || !b) { el.textContent = '请选择两个日期'; return; }
+  var diff = dayDiff(a, b);
+  el.innerHTML = diff === 0 ? '两个日期是同一天' :
+    (diff > 0 ? '相差 <b>' + diff + '</b> 天' : '相差 <b>' + Math.abs(diff) + '</b> 天（结束日期更早）');
+}
+
+function calcTarget() {
+  var t = parseDate('target');
+  var el = document.getElementById('outTarget');
+  if (!t) { el.textContent = '请选择目标日期'; return; }
+  var today = new Date();
+  today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  var diff = dayDiff(today, t);
+  if (diff === 0) el.innerHTML = '就是今天！';
+  else if (diff > 0) el.innerHTML = '距 ' + fmtDate(t) + ' 还有 <b>' + diff + '</b> 天';
+  else el.innerHTML = fmtDate(t) + ' 已经过去 <b>' + Math.abs(diff) + '</b> 天了';
+}
+
+function calcAdd() {
+  var base = parseDate('base');
+  var days = parseInt(document.getElementById('days').value, 10);
+  var el = document.getElementById('outAdd');
+  if (!base) { el.textContent = '请选择起始日期'; return; }
+  if (isNaN(days)) { el.textContent = '请输入有效天数'; return; }
+  var res = new Date(base.getTime() + days * 86400000);
+  el.innerHTML = fmtDate(base) + (days >= 0 ? ' 加 ' : ' 减 ') + '<b>' + Math.abs(days) + '</b> 天 = <b>' + fmtDate(res) + '</b>';
+}
+
+// 默认填入今天与常见活动日（可改）
+(function () {
+  var today = new Date();
+  var pad = function (n) { return String(n).padStart(2, '0'); };
+  var iso = today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate());
+  document.getElementById('d1').value = iso;
+  document.getElementById('base').value = iso;
+  var future = new Date(today.getTime() + 7 * 86400000);
+  document.getElementById('d2').value = future.getFullYear() + '-' + pad(future.getMonth() + 1) + '-' + pad(future.getDate());
+  document.getElementById('target').value = future.getFullYear() + '-' + pad(future.getMonth() + 1) + '-' + pad(future.getDate());
+})();
+</script>
+</body>
+</html>

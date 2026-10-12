@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>打字测速</title>
+<!--
+  插件式工具：打字测速（中文）
+  给定一段文字，开始输入后计时，实时统计速度（字/分钟）与正确率。
+  纯前端实现，可用于社团打字练习、趣味比赛。
+-->
+<style>
+  body { font-family: "Microsoft YaHei", Arial, sans-serif; max-width: 620px; margin: 20px auto; padding: 0 16px; color: #333; }
+  h1 { font-size: 18px; border-bottom: 2px solid #1e6bb8; padding-bottom: 8px; }
+  .target-text {
+    background: #f5f7fa; border: 1px solid #e3e8ee; border-radius: 8px;
+    padding: 12px 14px; font-size: 15px; line-height: 1.9; margin: 14px 0;
+    min-height: 80px; user-select: none;
+  }
+  .target-text .ok { color: #5cb85c; }
+  .target-text .bad { color: #d9534f; background: #fdecea; border-radius: 2px; }
+  .target-text .cur { border-bottom: 2px solid #1e6bb8; }
+  textarea { width: 100%; height: 90px; box-sizing: border-box; padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
+  .stats { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+  .stat { flex: 1; min-width: 100px; text-align: center; background: #eaf2fb; border-radius: 8px; padding: 10px 6px; }
+  .stat .num { font-size: 22px; font-weight: 700; color: #1e6bb8; }
+  .stat .lab { font-size: 12px; color: #666; }
+  button { padding: 9px 24px; border: none; border-radius: 6px; background: #1e6bb8; color: #fff; font-size: 15px; cursor: pointer; margin: 0 6px 6px 0; }
+  button:hover { opacity: .85; }
+  button.secondary { background: #6c757d; }
+  .hint { color: #888; font-size: 12px; margin-top: 14px; }
+</style>
+</head>
+<body>
+<h1>打字测速（中文）</h1>
+<p>照着下方文字输入，开始输入即自动计时，完成后查看速度与正确率。</p>
+
+<div class="target-text" id="target"></div>
+
+<textarea id="input" placeholder="在此输入上方文字..." disabled></textarea>
+
+<div class="stats">
+  <div class="stat"><div class="num" id="cpm">0</div><div class="lab">字/分钟</div></div>
+  <div class="stat"><div class="num" id="acc">0%</div><div class="lab">正确率</div></div>
+  <div class="stat"><div class="num" id="elapsed">0s</div><div class="lab">用时</div></div>
+  <div class="stat"><div class="num" id="done">0/0</div><div class="lab">进度</div></div>
+</div>
+
+<button onclick="startTest()">开始测试</button>
+<button class="secondary" onclick="resetTest()">重置</button>
+
+<p class="hint">说明：按「开始测试」后请在输入框中逐字输入，输入完成自动停止并统计成绩。本工具仅在浏览器本地运行。</p>
+
+<script>
+var TEXTS = [
+  '社团是我们共同的大家庭，这里汇聚了志同道合的伙伴，我们一起学习一起成长。',
+  '坚持每天进步一点点，日积月累就能看见巨大的变化，自律带来真正的自由。',
+  '活动预告：本周六下午两点在活动中心举办迎新晚会，欢迎大家准时参加。',
+  '编程让想法变成现实，每一行代码都是通往未来的阶梯，保持好奇心与热情。'
+];
+
+var targetEl = document.getElementById('target');
+var inputEl = document.getElementById('input');
+var targetText = '';
+var startTime = null;
+var timerId = null;
+var finished = false;
+
+function setTarget(text) {
+  targetText = text;
+  var html = '';
+  for (var i = 0; i < text.length; i++) html += '<span id="c' + i + '">' + text[i] + '</span>';
+  targetEl.innerHTML = html;
+}
+
+function startTest() {
+  // 随机选择一篇
+  var idx = Math.floor(Math.random() * TEXTS.length);
+  setTarget(TEXTS[idx]);
+  inputEl.value = '';
+  inputEl.disabled = false;
+  inputEl.focus();
+  startTime = null;
+  finished = false;
+  updateStats(0, '');
+  document.getElementById('done').textContent = '0/' + targetText.length;
+}
+
+function resetTest() {
+  inputEl.value = '';
+  inputEl.disabled = true;
+  if (timerId) clearInterval(timerId);
+  timerId = null;
+  startTime = null;
+  finished = false;
+  setTarget('');
+  updateStats(0, '');
+  document.getElementById('done').textContent = '0/0';
+}
+
+inputEl.addEventListener('input', function () {
+  if (finished) return;
+  if (!startTime) {
+    startTime = Date.now();
+    timerId = setInterval(function () { updateElapsed(); }, 250);
+  }
+  var typed = inputEl.value;
+  var correct = 0;
+  var limit = Math.min(typed.length, targetText.length);
+  for (var i = 0; i < limit; i++) {
+    var span = document.getElementById('c' + i);
+    if (typed[i] === targetText[i]) {
+      span.className = 'ok';
+      correct++;
+    } else {
+      span.className = 'bad';
+    }
+  }
+  // 未输入到的字符恢复样式
+  for (var j = limit; j < targetText.length; j++) {
+    document.getElementById('c' + j).className = '';
+  }
+  if (typed.length < targetText.length) {
+    document.getElementById('c' + typed.length).className = 'cur';
+  }
+  updateStats(correct, typed.length);
+  if (typed.length >= targetText.length) {
+    finish(correct);
+  }
+});
+
+function updateStats(correct, typedLen) {
+  var sec = startTime ? (Date.now() - startTime) / 1000 : 0;
+  var cpm = sec > 0 ? Math.round(correct / (sec / 60)) : 0;
+  document.getElementById('cpm').textContent = cpm;
+  document.getElementById('acc').textContent = typedLen > 0 ? Math.round(correct / typedLen * 100) + '%' : '0%';
+  document.getElementById('done').textContent = Math.min(typedLen, targetText.length) + '/' + targetText.length;
+}
+
+function updateElapsed() {
+  if (startTime) document.getElementById('elapsed').textContent = Math.floor((Date.now() - startTime) / 1000) + 's';
+}
+
+function finish(correct) {
+  finished = true;
+  if (timerId) clearInterval(timerId);
+  var sec = (Date.now() - startTime) / 1000;
+  var cpm = sec > 0 ? Math.round(correct / (sec / 60)) : 0;
+  document.getElementById('elapsed').textContent = Math.round(sec) + 's';
+  alert('完成！\n用时 ' + Math.round(sec) + ' 秒\n正确 ' + correct + '/' + targetText.length + ' 字\n速度 ' + cpm + ' 字/分钟\n正确率 ' + Math.round(correct / targetText.length * 100) + '%');
+}
+
+resetTest();
+</script>
+</body>
+</html>

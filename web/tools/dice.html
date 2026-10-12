@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>掷骰子</title>
+<!--
+  插件式工具：掷骰子（1~2 颗）
+  纯前端实现，带简单滚动动画与历史记录，可用于社团桌游、随机决策等。
+-->
+<style>
+  body { font-family: "Microsoft YaHei", Arial, sans-serif; max-width: 560px; margin: 20px auto; padding: 0 16px; color: #333; }
+  h1 { font-size: 18px; border-bottom: 2px solid #1e6bb8; padding-bottom: 8px; }
+  .dice-box { display: flex; justify-content: center; gap: 26px; margin: 26px 0; }
+  .dice {
+    width: 96px; height: 96px; border-radius: 14px; background: #fff;
+    border: 3px solid #1e6bb8; display: flex; flex-wrap: wrap;
+    align-content: center; justify-content: center; padding: 10px; box-sizing: border-box;
+  }
+  .dice .dot { width: 16px; height: 16px; border-radius: 50%; background: #1e6bb8; margin: 4px; }
+  .dice .dot.hidden { visibility: hidden; }
+  .btn-row { text-align: center; margin: 14px 0; }
+  button { padding: 9px 26px; border: none; border-radius: 6px; background: #1e6bb8; color: #fff; font-size: 15px; cursor: pointer; margin: 0 6px; }
+  button:hover { opacity: .85; }
+  button.secondary { background: #6c757d; }
+  .total { text-align: center; font-size: 20px; font-weight: 700; color: #1e6bb8; min-height: 30px; }
+  .history { margin-top: 18px; }
+  .history h3 { font-size: 14px; color: #666; }
+  .history ul { list-style: none; padding: 0; margin: 6px 0 0; max-height: 160px; overflow-y: auto; }
+  .history li { padding: 4px 8px; border-bottom: 1px dashed #eee; font-size: 13px; }
+  .hint { color: #888; font-size: 12px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<h1>掷骰子</h1>
+<p>点击「掷骰子」随机生成 1~2 颗骰子点数，可用于桌游、抽签、随机决策。</p>
+
+<div class="dice-box">
+  <div class="dice" id="dice1"></div>
+  <div class="dice" id="dice2"></div>
+</div>
+
+<div class="total" id="total">点击开始</div>
+
+<div class="btn-row">
+  <button onclick="roll()">掷骰子</button>
+  <button class="secondary" onclick="toggleMode()">切换单/双骰</button>
+  <button class="secondary" onclick="clearHistory()">清空记录</button>
+</div>
+
+<div class="history">
+  <h3>历史记录</h3>
+  <ul id="history"></ul>
+</div>
+
+<p class="hint">说明：双骰模式下显示两骰总和。本工具仅在浏览器本地运行。</p>
+
+<script>
+var diceCount = 2;
+var rolling = false;
+
+// 每个点数对应的点阵布局（骰子 3x3 网格，从 0 开始编号：0上左,1上中,2上右,3中左,4中中,5中右,6下左,7下中,8下右）
+var DOT_MAP = {
+  1: [4],
+  2: [0, 8],
+  3: [0, 4, 8],
+  4: [0, 2, 6, 8],
+  5: [0, 2, 4, 6, 8],
+  6: [0, 2, 3, 5, 6, 8]
+};
+
+function renderDie(el, value) {
+  var html = '';
+  for (var i = 0; i < 9; i++) {
+    html += '<div class="dot' + (DOT_MAP[value].indexOf(i) === -1 ? ' hidden' : '') + '"></div>';
+  }
+  el.innerHTML = html;
+}
+
+function randomValue() { return Math.floor(Math.random() * 6) + 1; }
+
+function roll() {
+  if (rolling) return;
+  rolling = true;
+  // 滚动动画：快速随机变换 12 次
+  var rounds = 12;
+  var i = 0;
+  var timer = setInterval(function () {
+    var v1 = randomValue();
+    renderDie(document.getElementById('dice1'), v1);
+    if (diceCount === 2) {
+      var v2 = randomValue();
+      renderDie(document.getElementById('dice2'), v2);
+    } else {
+      document.getElementById('dice2').innerHTML = '';
+    }
+    i++;
+    if (i >= rounds) {
+      clearInterval(timer);
+      var f1 = randomValue();
+      var f2 = randomValue();
+      renderDie(document.getElementById('dice1'), f1);
+      if (diceCount === 2) {
+        renderDie(document.getElementById('dice2'), f2);
+        document.getElementById('total').textContent = '点数：' + f1 + ' + ' + f2 + ' = ' + (f1 + f2);
+        addHistory(f1 + ' + ' + f2 + ' = ' + (f1 + f2));
+      } else {
+        document.getElementById('total').textContent = '点数：' + f1;
+        addHistory(f1);
+      }
+      rolling = false;
+    }
+  }, 70);
+}
+
+function toggleMode() {
+  diceCount = diceCount === 1 ? 2 : 1;
+  document.getElementById('dice1').innerHTML = '';
+  document.getElementById('dice2').innerHTML = '';
+  document.getElementById('total').textContent = '已切换为' + (diceCount === 1 ? '单骰' : '双骰') + '模式，点击开始';
+}
+
+function addHistory(text) {
+  var ul = document.getElementById('history');
+  var now = new Date();
+  var ts = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0');
+  var li = document.createElement('li');
+  li.textContent = ts + '  掷出 ' + text;
+  ul.insertBefore(li, ul.firstChild);
+  if (ul.children.length > 30) ul.removeChild(ul.lastChild);
+}
+
+function clearHistory() { document.getElementById('history').innerHTML = ''; }
+</script>
+</body>
+</html>

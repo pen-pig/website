@@ -1,0 +1,17 @@
+# 公开仓库只推代码;以下全部排除(数据/隐私/大文件)
+backups/
+/tools/
+.workbuddy/
+website.zip
+website.7z
+*.zip
+*.7z
+*.log
+
+# 运行时数据(JSON 存储、上传图片、OJ 测试数据、网盘)
+web/data/json/
+web/data/img/
+web/data/oj/
+web/data/uploads/
+web/drive/
+web/chunks_tmp/

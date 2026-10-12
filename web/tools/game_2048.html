@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2048 小游戏</title>
+<!--
+  插件式工具：2048 数字合并小游戏
+  纯前端实现，方向键 / WASD / 触屏滑动均可操作，适配手机。
+-->
+<style>
+  body { font-family: "Microsoft YaHei", Arial, sans-serif; max-width: 520px; margin: 20px auto; padding: 0 16px; color: #333; }
+  h1 { font-size: 18px; border-bottom: 2px solid #1e6bb8; padding-bottom: 8px; }
+  .head { display: flex; justify-content: space-between; align-items: center; margin: 14px 0 8px; }
+  .score { background: #eaf2fb; border-radius: 8px; padding: 8px 16px; font-size: 14px; }
+  .score b { color: #1e6bb8; font-size: 18px; }
+  button { padding: 8px 20px; border: none; border-radius: 6px; background: #1e6bb8; color: #fff; font-size: 14px; cursor: pointer; }
+  button:hover { opacity: .85; }
+  .board-wrap { position: relative; }
+  .board {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    background: #bbada0; border-radius: 10px; padding: 8px;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .cell {
+    height: 72px; border-radius: 6px; background: #cdc1b4;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 700; color: #776e65;
+  }
+  .cell.t2 { background: #eee4da; }
+  .cell.t4 { background: #ede0c8; }
+  .cell.t8 { background: #f2b179; color: #f9f6f2; }
+  .cell.t16 { background: #f59563; color: #f9f6f2; }
+  .cell.t32 { background: #f67c5f; color: #f9f6f2; }
+  .cell.t64 { background: #f65e3b; color: #f9f6f2; }
+  .cell.t128 { background: #edcf72; color: #f9f6f2; font-size: 24px; }
+  .cell.t256 { background: #edcc61; color: #f9f6f2; font-size: 24px; }
+  .cell.t512 { background: #edc850; color: #f9f6f2; font-size: 22px; }
+  .cell.t1024 { background: #edc53f; color: #f9f6f2; font-size: 20px; }
+  .cell.t2048 { background: #edc22e; color: #f9f6f2; font-size: 20px; }
+  .overlay {
+    position: absolute; inset: 0; background: rgba(238,228,218,0.8);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    border-radius: 10px; font-size: 22px; font-weight: 700; color: #776e65;
+  }
+  .overlay.show { display: flex; }
+  .overlay button { margin-top: 12px; }
+  .hint { color: #888; font-size: 12px; margin-top: 14px; }
+</style>
+</head>
+<body>
+<h1>2048 小游戏</h1>
+
+<div class="head">
+  <div class="score">得分：<b id="score">0</b></div>
+  <button onclick="restart()">重新开始</button>
+</div>
+
+<div class="board-wrap">
+  <div class="board" id="board"></div>
+  <div class="overlay" id="overlay">
+    <div id="overlayText">游戏结束</div>
+    <button onclick="restart()">再来一局</button>
+  </div>
+</div>
+
+<p class="hint">操作：键盘方向键 / WASD，手机上直接滑动屏幕。相同数字碰撞会合并翻倍，合成 2048 即胜利！</p>
+
+<script>
+var SIZE = 4;
+var grid = [];
+var score = 0;
+var gameOver = false;
+var boardEl = document.getElementById('board');
+var scoreEl = document.getElementById('score');
+var overlayEl = document.getElementById('overlay');
+var overlayTextEl = document.getElementById('overlayText');
+
+function newCell() { return Math.random() < 0.9 ? 2 : 4; }
+
+function initGrid() {
+  grid = [];
+  for (var r = 0; r < SIZE; r++) {
+    grid.push([]);
+    for (var c = 0; c < SIZE; c++) grid[r].push(0);
+  }
+  score = 0;
+  gameOver = false;
+  addRandom();
+  addRandom();
+  overlayEl.classList.remove('show');
+  render();
+}
+
+function addRandom() {
+  var empty = [];
+  for (var r = 0; r < SIZE; r++)
+    for (var c = 0; c < SIZE; c++)
+      if (grid[r][c] === 0) empty.push([r, c]);
+  if (empty.length === 0) return false;
+  var p = empty[Math.floor(Math.random() * empty.length)];
+  grid[p[0]][p[1]] = newCell();
+  return true;
+}
+
+// dir: 'left'|'right'|'up'|'down'
+function move(dir) {
+  if (gameOver) return;
+  var moved = false;
+  // 先转成行处理：left 为基准；right 翻转行；up/down 转置处理
+  var matrix = grid.map(function (row) { return row.slice(); });
+  if (dir === 'up' || dir === 'down') {
+    matrix = transpose(matrix);
+    if (dir === 'down') matrix = matrix.map(reverseRow);
+  } else if (dir === 'right') {
+    matrix = matrix.map(reverseRow);
+  }
+
+  for (var r = 0; r < SIZE; r++) {
+    var res = collapse(matrix[r]);
+    if (res.changed) moved = true;
+    score += res.gain;
+    matrix[r] = res.row;
+  }
+
+  if (dir === 'up' || dir === 'down') {
+    if (dir === 'down') matrix = matrix.map(reverseRow);
+    matrix = transpose(matrix);
+  } else if (dir === 'right') {
+    matrix = matrix.map(reverseRow);
+  }
+
+  if (moved) {
+    grid = matrix;
+    addRandom();
+    render();
+    checkEnd();
+  }
+}
+
+function collapse(line) {
+  var vals = line.filter(function (v) { return v !== 0; });
+  var out = [];
+  var gain = 0;
+  var changed = false;
+  for (var i = 0; i < vals.length; i++) {
+    if (i + 1 < vals.length && vals[i] === vals[i + 1]) {
+      out.push(vals[i] * 2);
+      gain += vals[i] * 2;
+      i++;
+      changed = true;
+    } else {
+      out.push(vals[i]);
+    }
+  }
+  while (out.length < SIZE) out.push(0);
+  if (out.join(',') !== line.join(',')) changed = true;
+  return { row: out, gain: gain, changed: changed };
+}
+
+function transpose(m) {
+  var res = [];
+  for (var c = 0; c < SIZE; c++) {
+    res.push([]);
+    for (var r = 0; r < SIZE; r++) res[c].push(m[r][c]);
+  }
+  return res;
+}
+
+function reverseRow(row) { return row.slice().reverse(); }
+
+function render() {
+  scoreEl.textContent = score;
+  var html = '';
+  for (var r = 0; r < SIZE; r++) {
+    for (var c = 0; c < SIZE; c++) {
+      var v = grid[r][c];
+      html += '<div class="cell' + (v ? ' t' + v : '') + '">' + (v || '') + '</div>';
+    }
+  }
+  boardEl.innerHTML = html;
+}
+
+function canMove() {
+  for (var r = 0; r < SIZE; r++)
+    for (var c = 0; c < SIZE; c++) {
+      if (grid[r][c] === 0) return true;
+      if (c + 1 < SIZE && grid[r][c] === grid[r][c + 1]) return true;
+      if (r + 1 < SIZE && grid[r][c] === grid[r + 1][c]) return true;
+    }
+  return false;
+}
+
+function checkEnd() {
+  var win = false;
+  for (var r = 0; r < SIZE; r++)
+    for (var c = 0; c < SIZE; c++)
+      if (grid[r][c] === 2048) win = true;
+  if (win) {
+    gameOver = true;
+    overlayTextEl.textContent = '🎉 恭喜合成 2048！';
+    overlayEl.classList.add('show');
+    return;
+  }
+  if (!canMove()) {
+    gameOver = true;
+    overlayTextEl.textContent = '游戏结束，没有可合并的格子';
+    overlayEl.classList.add('show');
+  }
+}
+
+function restart() { initGrid(); }
+
+// 键盘控制
+document.addEventListener('keydown', function (e) {
+  var key = e.key;
+  if (['ArrowLeft', 'a', 'A'].indexOf(key) >= 0) { e.preventDefault(); move('left'); }
+  else if (['ArrowRight', 'd', 'D'].indexOf(key) >= 0) { e.preventDefault(); move('right'); }
+  else if (['ArrowUp', 'w', 'W'].indexOf(key) >= 0) { e.preventDefault(); move('up'); }
+  else if (['ArrowDown', 's', 'S'].indexOf(key) >= 0) { e.preventDefault(); move('down'); }
+});
+
+// 触屏滑动控制
+var touchX = null, touchY = null;
+boardEl.addEventListener('touchstart', function (e) {
+  touchX = e.touches[0].clientX;
+  touchY = e.touches[0].clientY;
+}, { passive: true });
+boardEl.addEventListener('touchend', function (e) {
+  if (touchX === null) return;
+  var dx = e.changedTouches[0].clientX - touchX;
+  var dy = e.changedTouches[0].clientY - touchY;
+  if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    move(dx > 0 ? 'right' : 'left');
+  } else {
+    move(dy > 0 ? 'down' : 'up');
+  }
+  touchX = null;
+  touchY = null;
+}, { passive: true });
+
+initGrid();
+</script>
+</body>
+</html>

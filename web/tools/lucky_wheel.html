@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>活动抽奖转盘</title>
+<!--
+  插件式工具：活动抽奖 / 随机点名转盘
+  纯前端实现，Canvas 绘制转盘，点击按钮旋转，随机停在一个分区。
+  分区名称可在下方编辑（默认示例为社团活动奖品 / 点名名单）。
+-->
+<style>
+  body { font-family: "Microsoft YaHei", Arial, sans-serif; max-width: 620px; margin: 20px auto; padding: 0 16px; color: #333; }
+  h1 { font-size: 18px; border-bottom: 2px solid #1e6bb8; padding-bottom: 8px; }
+  .wheel-wrap { text-align: center; margin: 18px 0; }
+  canvas { max-width: 100%; height: auto; }
+  .btn-row { text-align: center; margin: 14px 0; }
+  button { padding: 9px 24px; border: none; border-radius: 6px; background: #1e6bb8; color: #fff; font-size: 15px; cursor: pointer; margin: 0 6px; }
+  button:hover { opacity: .85; }
+  button.secondary { background: #6c757d; }
+  .result { text-align: center; font-size: 20px; font-weight: 700; color: #1e6bb8; min-height: 30px; margin: 10px 0; }
+  textarea { width: 100%; height: 90px; box-sizing: border-box; padding: 8px; font-size: 13px; border: 1px solid #ccc; border-radius: 6px; }
+  .row-label { font-weight: 600; margin-top: 14px; }
+  .hint { color: #888; font-size: 12px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<h1>活动抽奖转盘 / 随机点名</h1>
+<p>输入分区名称（每行一个，建议 2~12 个），点击「开始抽奖」转动转盘。</p>
+
+<div class="wheel-wrap">
+  <canvas id="wheel" width="480" height="480"></canvas>
+</div>
+
+<div class="result" id="result">点击下方按钮开始抽奖</div>
+
+<div class="btn-row">
+  <button onclick="spin()">开始抽奖</button>
+  <button class="secondary" onclick="redraw()">重新绘制</button>
+</div>
+
+<div class="row-label">分区名称（每行一个）</div>
+<textarea id="items">社团之星
+最佳进步
+幸运观众
+一等奖
+二等奖
+三等奖
+参与奖
+神秘大奖</textarea>
+
+<p class="hint">说明：转盘停靠结果完全随机，可用于活动抽奖、随机点名等场景。本工具仅在浏览器本地运行。</p>
+
+<script>
+var canvas = document.getElementById('wheel');
+var ctx = canvas.getContext('2d');
+var currentAngle = 0;   // 当前转盘角度（弧度）
+var spinning = false;
+var pointerDeg = -90;   // 指针指向正上方
+
+// 配色数组（区分相邻分区）
+var COLORS = ['#1e6bb8', '#f0ad4e', '#5cb85c', '#d9534f', '#5bc0de', '#f7b731', '#a55eea', '#26de81', '#fc5c65', '#45aaf2', '#fd9644', '#778ca3'];
+
+function getItems() {
+  var list = [];
+  var lines = document.getElementById('items').value.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var t = lines[i].trim();
+    if (t !== '') list.push(t);
+  }
+  if (list.length < 2) list = ['默认奖项A', '默认奖项B'];
+  return list;
+}
+
+function redraw() {
+  var items = getItems();
+  var n = items.length;
+  var arc = (Math.PI * 2) / n;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 绘制转盘分区
+  for (var i = 0; i < n; i++) {
+    var start = currentAngle + i * arc;
+    ctx.beginPath();
+    ctx.moveTo(240, 240);
+    ctx.arc(240, 240, 225, start, start + arc);
+    ctx.closePath();
+    ctx.fillStyle = COLORS[i % COLORS.length];
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 分区文字（径向）
+    ctx.save();
+    ctx.translate(240, 240);
+    ctx.rotate(start + arc / 2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 15px "Microsoft YaHei", Arial';
+    var txt = items[i];
+    if (txt.length > 6) txt = txt.slice(0, 6) + '…';
+    ctx.fillText(txt, 200, 6);
+    ctx.restore();
+  }
+
+  // 外圈描边
+  ctx.beginPath();
+  ctx.arc(240, 240, 225, 0, Math.PI * 2);
+  ctx.strokeStyle = '#1e6bb8';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // 中心圆
+  ctx.beginPath();
+  ctx.arc(240, 240, 26, 0, Math.PI * 2);
+  ctx.fillStyle = '#1e6bb8';
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // 指针（正上方三角）
+  ctx.beginPath();
+  ctx.moveTo(240, 8);
+  ctx.lineTo(226, 36);
+  ctx.lineTo(254, 36);
+  ctx.closePath();
+  ctx.fillStyle = '#d9534f';
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.stroke();
+}
+
+function spin() {
+  if (spinning) return;
+  var items = getItems();
+  var n = items.length;
+  var extra = Math.random() * Math.PI * 2 * 6 + Math.PI * 6; // 随机旋转 3~9 圈
+  var target = currentAngle + extra;
+  var startAngle = currentAngle;
+  var startTime = Date.now();
+  var duration = 4000; // 4 秒动画
+  spinning = true;
+  document.getElementById('result').textContent = '转动中...';
+
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function step() {
+    var p = Math.min(1, (Date.now() - startTime) / duration);
+    currentAngle = startAngle + (target - startAngle) * easeOut(p);
+    redraw();
+    if (p < 1) {
+      requestAnimationFrame(step);
+    } else {
+      spinning = false;
+      // 计算指针（-90°）落在哪个分区
+      var arc = (Math.PI * 2) / n;
+      var pointerRad = ((pointerDeg * Math.PI / 180) - currentAngle) % (Math.PI * 2);
+      while (pointerRad < 0) pointerRad += Math.PI * 2;
+      var idx = Math.floor(pointerRad / arc) % n;
+      document.getElementById('result').textContent = '🎉 抽中：' + items[idx];
+    }
+  }
+  step();
+}
+
+redraw();
+</script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>番茄钟 / 倒计时</title>
+<!--
+  插件式工具：番茄钟 + 自定义倒计时
+  经典 25 分钟专注 / 5 分钟休息，可自定义时长；结束时蜂鸣提醒。
+  纯前端实现，使用 Web Audio API 生成提示音（无需外部音频文件）。
+-->
+<style>
+  body { font-family: "Microsoft YaHei", Arial, sans-serif; max-width: 520px; margin: 20px auto; padding: 0 16px; color: #333; }
+  h1 { font-size: 18px; border-bottom: 2px solid #1e6bb8; padding-bottom: 8px; }
+  .mode-tabs { text-align: center; margin: 16px 0; }
+  .mode-tabs button { padding: 7px 18px; border: 2px solid #1e6bb8; background: #fff; color: #1e6bb8; font-size: 14px; cursor: pointer; margin: 0 4px; border-radius: 20px; }
+  .mode-tabs button.active { background: #1e6bb8; color: #fff; }
+  .clock {
+    font-size: 64px; font-weight: 700; text-align: center; color: #1e6bb8;
+    font-variant-numeric: tabular-nums; margin: 18px 0; letter-spacing: 2px;
+  }
+  .clock.running { color: #d9534f; }
+  .ctrl { text-align: center; margin: 14px 0; }
+  button { padding: 9px 24px; border: none; border-radius: 6px; background: #1e6bb8; color: #fff; font-size: 15px; cursor: pointer; margin: 0 6px; }
+  button:hover { opacity: .85; }
+  button.secondary { background: #6c757d; }
+  button.success { background: #5cb85c; }
+  .custom { text-align: center; margin: 14px 0; }
+  .custom label { font-size: 13px; color: #666; }
+  .custom input { width: 70px; padding: 6px; border: 1px solid #ccc; border-radius: 6px; text-align: center; font-size: 14px; }
+  .status { text-align: center; color: #888; font-size: 13px; min-height: 20px; }
+  .hint { color: #888; font-size: 12px; margin-top: 16px; text-align: center; }
+</style>
+</head>
+<body>
+<h1>番茄钟 / 倒计时</h1>
+
+<div class="mode-tabs">
+  <button id="tabFocus" class="active" onclick="setMode('focus')">专注 25 分钟</button>
+  <button id="tabBreak" onclick="setMode('break')">休息 5 分钟</button>
+  <button id="tabCustom" onclick="setMode('custom')">自定义</button>
+</div>
+
+<div class="clock" id="clock">25:00</div>
+<div class="status" id="status">准备好开始专注了吗？</div>
+
+<div class="ctrl">
+  <button id="btnStart" onclick="toggle()">开始</button>
+  <button class="secondary" onclick="reset()">重置</button>
+</div>
+
+<div class="custom">
+  <label>自定义分钟：<input type="number" id="customMin" min="1" max="180" value="10"></label>
+  <button class="success" onclick="applyCustom()">应用</button>
+</div>
+
+<p class="hint">说明：专注结束会发出三声提示音；可自定义 1~180 分钟。本工具仅在浏览器本地运行。</p>
+
+<script>
+var totalSec = 25 * 60;
+var remainSec = totalSec;
+var timerId = null;
+var running = false;
+var mode = 'focus';
+
+var clockEl = document.getElementById('clock');
+var statusEl = document.getElementById('status');
+
+function fmt(sec) {
+  var m = Math.floor(sec / 60);
+  var s = sec % 60;
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function render() { clockEl.textContent = fmt(remainSec); }
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('tabFocus').classList.toggle('active', m === 'focus');
+  document.getElementById('tabBreak').classList.toggle('active', m === 'break');
+  document.getElementById('tabCustom').classList.toggle('active', m === 'custom');
+  stopTimer();
+  if (m === 'focus') { totalSec = 25 * 60; statusEl.textContent = '专注模式：25 分钟'; }
+  if (m === 'break') { totalSec = 5 * 60; statusEl.textContent = '休息模式：5 分钟'; }
+  if (m === 'custom') { totalSec = Math.max(1, parseInt(document.getElementById('customMin').value || '10', 10)) * 60; statusEl.textContent = '自定义倒计时'; }
+  remainSec = totalSec;
+  render();
+}
+
+function applyCustom() { setMode('custom'); }
+
+function toggle() {
+  if (running) { pause(); return; }
+  running = true;
+  document.getElementById('btnStart').textContent = '暂停';
+  clockEl.classList.add('running');
+  statusEl.textContent = '计时中...';
+  timerId = setInterval(tick, 1000);
+}
+
+function pause() {
+  running = false;
+  clearInterval(timerId);
+  document.getElementById('btnStart').textContent = '继续';
+  clockEl.classList.remove('running');
+  statusEl.textContent = '已暂停';
+}
+
+function stopTimer() {
+  running = false;
+  if (timerId) clearInterval(timerId);
+  document.getElementById('btnStart').textContent = '开始';
+  clockEl.classList.remove('running');
+}
+
+function reset() {
+  stopTimer();
+  remainSec = totalSec;
+  render();
+  statusEl.textContent = '已重置';
+}
+
+function tick() {
+  remainSec--;
+  render();
+  if (remainSec <= 0) {
+    stopTimer();
+    remainSec = totalSec;
+    render();
+    statusEl.textContent = '⏰ 时间到！';
+    beep(3);
+  }
+}
+
+// Web Audio 蜂鸣提示
+function beep(times) {
+  var AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  var ctx = new AudioCtx();
+  var count = 0;
+  function playOne() {
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.5);
+    count++;
+    if (count < times) setTimeout(playOne, 600);
+    else setTimeout(function () { ctx.close(); }, 2000);
+  }
+  playOne();
+}
+
+render();
+</script>
+</body>
+</html>

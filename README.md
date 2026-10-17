@@ -1,13 +1,3 @@
-\---  
-AIGC:  
-    Label: "1"  
-    ContentProducer: 001191440300708461136T1XGW3  
-    ProduceID: bc49c4ac6fb27cdef0692ccde63abaf1_6d792c3cb7db11f1a59e525400248c00  
-    ReservedCode1: 6kfeSn0JCdz5XHR7NhYeR15ZrnppoycOOu3SNEUyTP8wGzpKnATdCm1dMyIj+H4Cb0FKB1LKheDO3MP0X7W55IMWos9YgBMs9NMQDcBaov5CcND4GkzHS9AevCZxeslKfARF0Rp/hze74wLphoafB5q0cWVGicH7UMuU89T30eYp0NHT183nzdQdWvE=  
-    ContentPropagator: 001191440300708461136T1XGW3  
-    PropagateID: bc49c4ac6fb27cdef0692ccde63abaf1_6d792c3cb7db11f1a59e525400248c00  
-    ReservedCode2: 6kfeSn0JCdz5XHR7NhYeR15ZrnppoycOOu3SNEUyTP8wGzpKnATdCm1dMyIj+H4Cb0FKB1LKheDO3MP0X7W55IMWos9YgBMs9NMQDcBaov5CcND4GkzHS9AevCZxeslKfARF0Rp/hze74wLphoafB5q0cWVGicH7UMuU89T30eYp0NHT183nzdQdWvE=  
-\---
 
 # 社团官网系统（Club Website System）v1.5
 
@@ -243,5 +233,5 @@ php    tools/oj_selftest.php        # 命令行验证评测引擎（不依赖网
 
 - 数据、网盘、文档均在本仓库 `data/`、`drive/` 下，改动即时生效。
 
-*（内容由AI生成，仅供参考）*
+*（内容以及项目全部由AI生成，仅供参考）*
 
